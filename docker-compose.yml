@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  synapse:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=synapse
+      - DB_USER=synapse
+      - DB_PASSWORD=synapse123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto
+    restart: unless-stopped
+    networks:
+      - synapse-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=synapse
+      - POSTGRES_PASSWORD=synapse123
+      - POSTGRES_DB=synapse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - synapse-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - synapse-network
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    ports:
+      - "1883:1883"
+    restart: unless-stopped
+    networks:
+      - synapse-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:
+
+networks:
+  synapse-network:
+    driver: bridge

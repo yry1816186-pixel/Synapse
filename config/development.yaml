@@ -1,0 +1,35 @@
+# Synapse 开发环境配置
+
+app:
+  name: Synapse
+  version: 3.0.0
+  debug: true
+
+database:
+  host: localhost
+  port: 5432
+  database: synapse_dev
+  username: synapse
+  password: synapse123
+  pool_size: 5
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+
+mqtt:
+  host: localhost
+  port: 1883
+  client_id: synapse_dev
+
+api:
+  host: 0.0.0.0
+  port: 8000
+  debug: true
+  cors_origins:
+    - "*"
+
+logging:
+  level: DEBUG
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

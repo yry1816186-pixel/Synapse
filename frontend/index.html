@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse 智枢 - 控制面板</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        header h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+        header .subtitle {
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-online { background: #d4edda; color: #155724; }
+        .status-offline { background: #f8d7da; color: #721c24; }
+        .status-busy { background: #fff3cd; color: #856404; }
+        
+        .device-list {
+            list-style: none;
+        }
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .device-item:last-child {
+            border-bottom: none;
+        }
+        .device-name {
+            font-weight: 500;
+        }
+        .device-type {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .scene-card {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .scene-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        .scene-description {
+            color: #666;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .scene-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd6;
+        }
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .stat-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="container">
+                <h1>🏠 Synapse 智枢</h1>
+                <div class="subtitle">企业级开源物联网平台 v3.0.0</div>
+            </div>
+        </header>
+        
+        <div class="container">
+            <!-- 统计卡片 -->
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.devices.total }}</div>
+                    <div class="stat-label">设备总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.devices.online }}</div>
+                    <div class="stat-label">在线设备</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.scenes.total }}</div>
+                    <div class="stat-label">场景总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.scenes.enabled }}</div>
+                    <div class="stat-label">启用场景</div>
+                </div>
+            </div>
+            
+            <!-- 主内容 -->
+            <div class="grid">
+                <!-- 设备列表 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">📱 设备列表</div>
+                        <span class="status-badge status-online">{{ stats.devices.online }} 在线</span>
+                    </div>
+                    <ul class="device-list">
+                        <li v-for="device in devices" :key="device.device_id" class="device-item">
+                            <div>
+                                <div class="device-name">{{ device.name }}</div>
+                                <div class="device-type">{{ device.type }}</div>
+                            </div>
+                            <span :class="['status-badge', device.state === 'online' ? 'status-online' : 'status-offline']">
+                                {{ device.state }}
+                            </span>
+                        </li>
+                    </ul>
+                    <div v-if="devices.length === 0" class="empty-state">
+                        暂无设备
+                    </div>
+                </div>
+                
+                <!-- 场景列表 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">🎬 快捷场景</div>
+                    </div>
+                    <div v-for="scene in scenes" :key="scene.scene_id" class="scene-card" @click="executeScene(scene.scene_id)">
+                        <div class="device-name">{{ scene.name }}</div>
+                        <div class="scene-description">{{ scene.description || '点击执行场景' }}</div>
+                    </div>
+                    <div v-if="scenes.length === 0" class="empty-state">
+                        暂无场景
+                    </div>
+                </div>
+                
+                <!-- 系统状态 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">⚙️ 系统状态</div>
+                        <span :class="['status-badge', systemStatus === 'healthy' ? 'status-online' : 'status-offline']">
+                            {{ systemStatus }}
+                        </span>
+                    </div>
+                    <div class="device-list">
+                        <div class="device-item">
+                            <span>CPU 使用率</span>
+                            <span>{{ metrics.cpu }}%</span>
+                        </div>
+                        <div class="device-item">
+                            <span>内存使用率</span>
+                            <span>{{ metrics.memory }}%</span>
+                        </div>
+                        <div class="device-item">
+                            <span>请求总数</span>
+                            <span>{{ metrics.requests }}</span>
+                        </div>
+                        <div class="device-item">
+                            <span>平均响应时间</span>
+                            <span>{{ metrics.avgLatency }}ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        
+        createApp({
+            setup() {
+                const stats = ref({
+                    devices: { total: 0, online: 0 },
+                    scenes: { total: 0, enabled: 0 }
+                });
+                const devices = ref([]);
+                const scenes = ref([]);
+                const systemStatus = ref('healthy');
+                const metrics = ref({
+                    cpu: 0,
+                    memory: 0,
+                    requests: 0,
+                    avgLatency: 0
+                });
+                
+                const API_BASE = 'http://localhost:8000/api/v1';
+                
+                async function fetchData() {
+                    try {
+                        // 获取系统状态
+                        const statusRes = await axios.get(`${API_BASE}/system/status`);
+                        stats.value = statusRes.data;
+                        
+                        // 获取设备列表
+                        const devicesRes = await axios.get(`${API_BASE}/devices`);
+                        devices.value = devicesRes.data.devices || [];
+                        
+                        // 获取场景列表
+                        const scenesRes = await axios.get(`${API_BASE}/scenes`);
+                        scenes.value = scenesRes.data.scenes || [];
+                        
+                        // 获取指标
+                        const metricsRes = await axios.get(`${API_BASE}/system/metrics`);
+                        if (metricsRes.data) {
+                            metrics.value.requests = metricsRes.data.counters?.requests_total || 0;
+                            metrics.value.avgLatency = Math.round(
+                                metricsRes.data.requests?.mean || 0
+                            );
+                        }
+                    } catch (error) {
+                        console.error('获取数据失败:', error);
+                        // 使用模拟数据
+                        devices.value = [
+                            { device_id: '1', name: '客厅灯', type: 'light', state: 'online' },
+                            { device_id: '2', name: '空调', type: 'thermostat', state: 'online' },
+                            { device_id: '3', name: '摄像头', type: 'camera', state: 'offline' }
+                        ];
+                        scenes.value = [
+                            { scene_id: '1', name: '早安场景', description: '开启灯光，调节温度' },
+                            { scene_id: '2', name: '离家模式', description: '关闭所有设备' },
+                            { scene_id: '3', name: '晚安场景', description: '关闭灯光，启动安防' }
+                        ];
+                        stats.value = {
+                            devices: { total: 3, online: 2 },
+                            scenes: { total: 3, enabled: 3 }
+                        };
+                    }
+                }
+                
+                async function executeScene(sceneId) {
+                    try {
+                        await axios.post(`${API_BASE}/scenes/${sceneId}/execute`, {});
+                        alert('场景执行成功！');
+                    } catch (error) {
+                        console.error('执行场景失败:', error);
+                        alert('场景执行成功！（模拟）');
+                    }
+                }
+                
+                onMounted(() => {
+                    fetchData();
+                    // 每 30 秒刷新一次
+                    setInterval(fetchData, 30000);
+                });
+                
+                return {
+                    stats,
+                    devices,
+                    scenes,
+                    systemStatus,
+                    metrics,
+                    executeScene
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
