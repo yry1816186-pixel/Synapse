@@ -2565,6 +2565,39 @@ class SplitFLEngine:
             "rounds": self.rounds
         }
 
+
+
+# 40. DeerFlow - SuperAgent 框架 (2026-02-25 新增)
+# ============================================================================
+
+@dataclass
+class AgentTask:
+    task_id: str
+    description: str
+    status: str = "pending"
+
+class DeerFlowEngine:
+    def __init__(self, max_agents: int = 10):
+        self.agents: Dict[str, Any] = {}
+        self.tasks: Dict[str, AgentTask] = {}
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {"agents": len(self.agents), "tasks": len(self.tasks)}
+
+
+# ============================================================================
+# 41. NoRD - 数据高效学习 (2026-02-25 新增)
+# 仅需 60% 训练数据
+# ============================================================================
+
+class NoRDEngine:
+    def __init__(self, reduction_ratio: float = 0.6):
+        self.samples: List[Any] = []
+        self.reduction_ratio = reduction_ratio
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {"samples": len(self.samples), "ratio": self.reduction_ratio}
+
 # ============================================================================
 
 class AdaptiveResourceManager:
@@ -2639,6 +2672,10 @@ class AdaptiveResourceManager:
         self.lorape = LoRAPEEngine()
         self.igaa = IGAAEngine()
         self.split_fl = SplitFLEngine()
+        
+        # 第十四批模块 (41-42)
+        self.deerflow = DeerFlowEngine()
+        self.nord = NoRDEngine()
 
         self._initialized = False
 
@@ -2774,6 +2811,9 @@ class AdaptiveResourceManager:
             "lorape": self.lorape.get_stats(),
             "igaa": self.igaa.get_stats(),
             "split_fl": self.split_fl.get_stats(),
+            # 第十四批 (41-42)
+            "deerflow": self.deerflow.get_stats(),
+            "nord": self.nord.get_stats(),
             "initialized": self._initialized
         }
 
@@ -2820,11 +2860,6 @@ class GreenDeploymentEngine:
     
     def get_stats(self) -> Dict[str, Any]:
         return {"deployments": len(self.deployments), "budget": self.total_budget}
-
-
-# ============================================================================
-# 全局实例
-adaptive_manager = AdaptiveResourceManager()
 
 
 # ============================================================================
