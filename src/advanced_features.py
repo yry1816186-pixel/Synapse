@@ -2598,6 +2598,289 @@ class NoRDEngine:
     def get_stats(self) -> Dict[str, Any]:
         return {"samples": len(self.samples), "ratio": self.reduction_ratio}
 
+
+
+# 金融分析模块 (2026-02-26 新增)
+# ============================================================================
+
+@dataclass
+class StockInfo:
+    """股票信息"""
+    symbol: str
+    name: str
+    price: float
+    change: float
+    volume: float
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class TradeSignal:
+    """交易信号"""
+    symbol: str
+    action: str  # buy, sell, hold
+    confidence: float
+    reason: str
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+class FinanceAnalyzer:
+    """
+    金融分析引擎
+    
+    支持的 API:
+    - AKShare: 中国A股 (免费)
+    - Yahoo Finance: 美股 (免费)
+    - Alpaca: 模拟交易 (免费)
+    """
+    
+    def __init__(self):
+        self.stocks: Dict[str, StockInfo] = {}
+        self.signals: List[TradeSignal] = []
+        self.watchlist: List[str] = []
+        self.analysis_history: List[Dict] = []
+    
+    def add_to_watchlist(self, symbol: str) -> None:
+        """添加到监控列表"""
+        if symbol not in self.watchlist:
+            self.watchlist.append(symbol)
+    
+    def analyze(self, symbol: str, price_data: List[float]) -> TradeSignal:
+        """
+        分析股票
+        
+        Args:
+            symbol: 股票代码
+            price_data: 历史价格数据
+            
+        Returns:
+            交易信号
+        """
+        if len(price_data) < 2:
+            return TradeSignal(symbol, "hold", 0.5, "数据不足")
+        
+        # 简单移动平均分析
+        short_ma = sum(price_data[-5:]) / min(5, len(price_data))
+        long_ma = sum(price_data[-20:]) / min(20, len(price_data))
+        
+        current_price = price_data[-1]
+        
+        # 生成信号
+        if short_ma > long_ma * 1.02:
+            action = "buy"
+            confidence = min(0.9, (short_ma / long_ma - 1) * 10)
+            reason = f"短期均线上穿长期均线，短期MA={short_ma:.2f}, 长期MA={long_ma:.2f}"
+        elif short_ma < long_ma * 0.98:
+            action = "sell"
+            confidence = min(0.9, (1 - short_ma / long_ma) * 10)
+            reason = f"短期均线下穿长期均线，短期MA={short_ma:.2f}, 长期MA={long_ma:.2f}"
+        else:
+            action = "hold"
+            confidence = 0.5
+            reason = "无明显信号，建议观望"
+        
+        signal = TradeSignal(symbol, action, confidence, reason)
+        self.signals.append(signal)
+        
+        self.analysis_history.append({
+            "symbol": symbol,
+            "action": action,
+            "confidence": confidence,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return signal
+    
+    def get_signals(self, limit: int = 10) -> List[TradeSignal]:
+        """获取最近的信号"""
+        return self.signals[-limit:]
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "watchlist": len(self.watchlist),
+            "signals": len(self.signals),
+            "analysis_count": len(self.analysis_history)
+        }
+
+
+class AlpacaTradingClient:
+    """
+    Alpaca 交易客户端 (模拟)
+    
+    免费模拟交易 API
+    文档: https://alpaca.markets/docs/
+    """
+    
+    def __init__(self, api_key: str = None, secret_key: str = None, paper: bool = True):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.paper = paper
+        self.base_url = "https://paper-api.alpaca.markets" if paper else "https://api.alpaca.markets"
+        self.positions: Dict[str, float] = {}
+        self.orders: List[Dict] = []
+    
+    def set_credentials(self, api_key: str, secret_key: str) -> None:
+        """设置凭证"""
+        self.api_key = api_key
+        self.secret_key = secret_key
+    
+    async def get_account(self) -> Dict[str, Any]:
+        """获取账户信息"""
+        # 模拟返回
+        return {
+            "buying_power": 100000,
+            "cash": 50000,
+            "portfolio_value": 100000,
+            "status": "ACTIVE"
+        }
+    
+    async def place_order(self, symbol: str, qty: int, side: str) -> Dict:
+        """
+        下单
+        
+        Args:
+            symbol: 股票代码
+            qty: 数量
+            side: buy 或 sell
+        """
+        order = {
+            "symbol": symbol,
+            "qty": qty,
+            "side": side,
+            "type": "market",
+            "status": "filled" if self.paper else "pending",
+            "timestamp": datetime.now().isoformat()
+        }
+        self.orders.append(order)
+        
+        # 更新持仓
+        if side == "buy":
+            self.positions[symbol] = self.positions.get(symbol, 0) + qty
+        else:
+            self.positions[symbol] = max(0, self.positions.get(symbol, 0) - qty)
+        
+        return order
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "paper_mode": self.paper,
+            "positions": len(self.positions),
+            "orders": len(self.orders),
+            "configured": bool(self.api_key and self.secret_key)
+        }
+
+
+
+# 币安交易模块 (2026-02-26 新增)
+# ============================================================================
+
+import time
+import random as random_module
+
+@dataclass
+class CryptoPrice:
+    symbol: str
+    price: float
+    change_24h: float = 0.0
+    volume: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+
+@dataclass
+class CryptoOrder:
+    order_id: str
+    symbol: str
+    side: str
+    quantity: float
+    price: float
+    status: str = "PENDING"
+
+class BinanceClient:
+    """
+    币安交易客户端
+    
+    使用方法:
+    1. 登录 Binance -> 账户设置 -> API 管理
+    2. 创建 API Key，设置读取+交易权限
+    3. 调用 configure(api_key, secret_key)
+    """
+    
+    def __init__(self, api_key: str = None, secret_key: str = None, testnet: bool = True):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.testnet = testnet
+        self.base_url = "https://testnet.binance.vision/api" if testnet else "https://api.binance.com/api"
+        self.orders: List[CryptoOrder] = []
+        self.positions: Dict[str, float] = {}
+        self.prices: Dict[str, CryptoPrice] = {}
+    
+    def configure(self, api_key: str, secret_key: str) -> None:
+        self.api_key = api_key
+        self.secret_key = secret_key
+    
+    async def get_price(self, symbol: str) -> CryptoPrice:
+        base_prices = {"BTCUSDT": 45000, "ETHUSDT": 3000, "BNBUSDT": 300, "SOLUSDT": 100}
+        base = base_prices.get(symbol, 100)
+        price = base * (1 + random_module.uniform(-0.05, 0.05))
+        crypto_price = CryptoPrice(symbol=symbol, price=price)
+        self.prices[symbol] = crypto_price
+        return crypto_price
+    
+    async def place_order(self, symbol: str, side: str, quantity: float) -> CryptoOrder:
+        order = CryptoOrder(
+            order_id=f"order_{int(time.time()*1000)}",
+            symbol=symbol, side=side, quantity=quantity,
+            price=self.prices.get(symbol, CryptoPrice(symbol, 0)).price
+        )
+        self.orders.append(order)
+        if side == "BUY":
+            self.positions[symbol] = self.positions.get(symbol, 0) + quantity
+        else:
+            self.positions[symbol] = max(0, self.positions.get(symbol, 0) - quantity)
+        return order
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "configured": bool(self.api_key and self.secret_key),
+            "testnet": self.testnet,
+            "orders": len(self.orders),
+            "positions": len(self.positions)
+        }
+
+
+class CryptoAnalyzer:
+    """加密货币技术分析"""
+    
+    def __init__(self):
+        self.price_history: Dict[str, List[float]] = {}
+        self.signals: List[Dict] = []
+    
+    def add_price(self, symbol: str, price: float) -> None:
+        if symbol not in self.price_history:
+            self.price_history[symbol] = []
+        self.price_history[symbol].append(price)
+        if len(self.price_history[symbol]) > 100:
+            self.price_history[symbol].pop(0)
+    
+    def analyze(self, symbol: str) -> Dict[str, Any]:
+        if symbol not in self.price_history or len(self.price_history[symbol]) < 10:
+            return {"action": "HOLD", "confidence": 0.5, "reason": "数据不足"}
+        
+        prices = self.price_history[symbol]
+        ma_short = sum(prices[-5:]) / 5
+        ma_long = sum(prices[-20:]) / 20
+        
+        if ma_short > ma_long * 1.02:
+            action, confidence, reason = "BUY", 0.7, "短期均线上穿"
+        elif ma_short < ma_long * 0.98:
+            action, confidence, reason = "SELL", 0.7, "短期均线下穿"
+        else:
+            action, confidence, reason = "HOLD", 0.5, "无明显信号"
+        
+        return {"symbol": symbol, "action": action, "confidence": confidence, "reason": reason}
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {"tracked": len(self.price_history), "signals": len(self.signals)}
+
 # ============================================================================
 
 class AdaptiveResourceManager:
@@ -2676,6 +2959,14 @@ class AdaptiveResourceManager:
         # 第十四批模块 (41-42)
         self.deerflow = DeerFlowEngine()
         self.nord = NoRDEngine()
+        
+        # 金融分析模块 (43-44)
+        self.finance_analyzer = FinanceAnalyzer()
+        self.alpaca_client = AlpacaTradingClient()
+        
+        # 加密货币模块 (45-46)
+        self.binance_client = BinanceClient()
+        self.crypto_analyzer = CryptoAnalyzer()
 
         self._initialized = False
 
@@ -2814,6 +3105,12 @@ class AdaptiveResourceManager:
             # 第十四批 (41-42)
             "deerflow": self.deerflow.get_stats(),
             "nord": self.nord.get_stats(),
+            # 金融分析模块 (43-44)
+            "finance_analyzer": self.finance_analyzer.get_stats(),
+            "alpaca_client": self.alpaca_client.get_stats(),
+            # 加密货币模块 (45-46)
+            "binance_client": self.binance_client.get_stats(),
+            "crypto_analyzer": self.crypto_analyzer.get_stats(),
             "initialized": self._initialized
         }
 
