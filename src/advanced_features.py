@@ -2881,6 +2881,261 @@ class CryptoAnalyzer:
     def get_stats(self) -> Dict[str, Any]:
         return {"tracked": len(self.price_history), "signals": len(self.signals)}
 
+
+
+# 富途 OpenAPI 模块 (2026-02-26 新增)
+# 文档: https://openapi.futunn.com/futu-api-doc/
+# ============================================================================
+
+@dataclass
+class FutuStock:
+    """富途股票"""
+    code: str  # 如 HK.00700, US.AAPL
+    name: str
+    price: float
+    change: float = 0.0
+    volume: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class FutuOrder:
+    """富途订单"""
+    order_id: str
+    code: str
+    side: str  # BUY, SELL
+    quantity: float
+    price: float
+    status: str = "PENDING"
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+class FutuClient:
+    """
+    富途 OpenAPI 客户端
+    
+    文档: https://openapi.futunn.com/futu-api-doc/
+    
+    配置步骤:
+    1. 注册富途证券账户: https://www.futunn.com
+    2. 下载 FutuOpenD 客户端
+    3. 登录客户端，开启 API 权限
+    4. 安装 SDK: pip install futu-api
+    5. 配置连接参数
+    
+    支持市场:
+    - 港股 (HK)
+    - 美股 (US)
+    - A股通 (SH/SZ)
+    """
+    
+    def __init__(self, host: str = "127.0.0.1", port: int = 11111):
+        self.host = host
+        self.port = port
+        self.connected = False
+        self.stocks: Dict[str, FutuStock] = {}
+        self.orders: List[FutuOrder] = []
+        self.positions: Dict[str, float] = {}
+        self.account_info: Dict[str, Any] = {}
+    
+    async def connect(self) -> bool:
+        """
+        连接 FutuOpenD
+        
+        需要:
+        1. FutuOpenD 客户端已启动
+        2. 已登录富途账户
+        """
+        try:
+            # 实际使用时安装 futu-api
+            # from futu import OpenQuoteContext, RET_OK
+            # quote_ctx = OpenQuoteContext(host=self.host, port=self.port)
+            # ret, data = quote_ctx.get_global_state()
+            # self.connected = (ret == RET_OK)
+            
+            # 模拟连接成功
+            self.connected = True
+            return True
+        except Exception as e:
+            print(f"连接失败: {e}")
+            return False
+    
+    async def get_quote(self, code: str) -> FutuStock:
+        """
+        获取股票行情
+        
+        Args:
+            code: 股票代码
+                  港股: HK.00700 (腾讯)
+                  美股: US.AAPL (苹果)
+                  A股: SH.600519 (茅台)
+        """
+        import random
+        
+        # 模拟价格数据
+        base_prices = {
+            "HK.00700": 300,      # 腾讯
+            "HK.09988": 100,      # 阿里
+            "US.AAPL": 180,       # 苹果
+            "US.TSLA": 200,       # 特斯拉
+            "SH.600519": 1500,    # 茅台
+        }
+        
+        base = base_prices.get(code, 100)
+        price = base * (1 + random.uniform(-0.03, 0.03))
+        change = random.uniform(-5, 5)
+        
+        stock = FutuStock(
+            code=code,
+            name=self._get_stock_name(code),
+            price=price,
+            change=change,
+            volume=random.uniform(100000, 10000000)
+        )
+        
+        self.stocks[code] = stock
+        return stock
+    
+    def _get_stock_name(self, code: str) -> str:
+        """获取股票名称"""
+        names = {
+            "HK.00700": "腾讯控股",
+            "HK.09988": "阿里巴巴",
+            "US.AAPL": "苹果",
+            "US.TSLA": "特斯拉",
+            "SH.600519": "贵州茅台",
+        }
+        return names.get(code, code)
+    
+    async def place_order(self, code: str, side: str, quantity: float, price: float = None) -> FutuOrder:
+        """
+        下单
+        
+        Args:
+            code: 股票代码
+            side: BUY 或 SELL
+            quantity: 数量 (港股按手，美股按股)
+            price: 价格 (None 为市价单)
+        """
+        if not self.connected:
+            raise Exception("请先连接 FutuOpenD")
+        
+        if price is None:
+            price = self.stocks.get(code, FutuStock(code, "", 0)).price
+        
+        order = FutuOrder(
+            order_id=f"futu_{int(datetime.now().timestamp() * 1000)}",
+            code=code,
+            side=side,
+            quantity=quantity,
+            price=price,
+            status="SUBMITTED"
+        )
+        
+        self.orders.append(order)
+        
+        # 更新持仓
+        if side == "BUY":
+            self.positions[code] = self.positions.get(code, 0) + quantity
+        else:
+            self.positions[code] = max(0, self.positions.get(code, 0) - quantity)
+        
+        return order
+    
+    async def get_account(self) -> Dict[str, Any]:
+        """获取账户信息"""
+        return {
+            "connected": self.connected,
+            "positions": self.positions,
+            "total_orders": len(self.orders),
+            "tracked_stocks": len(self.stocks)
+        }
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "connected": self.connected,
+            "host": self.host,
+            "port": self.port,
+            "orders": len(self.orders),
+            "positions": len(self.positions),
+            "tracked": len(self.stocks)
+        }
+
+
+class FutuAnalyzer:
+    """
+    富途股票分析器
+    
+    技术指标分析
+    """
+    
+    def __init__(self):
+        self.price_history: Dict[str, List[float]] = {}
+        self.signals: List[Dict] = []
+    
+    def add_price(self, code: str, price: float) -> None:
+        """添加价格数据"""
+        if code not in self.price_history:
+            self.price_history[code] = []
+        self.price_history[code].append(price)
+        
+        # 保持最近 100 条
+        if len(self.price_history[code]) > 100:
+            self.price_history[code].pop(0)
+    
+    def analyze(self, code: str) -> Dict[str, Any]:
+        """
+        分析股票并生成信号
+        
+        使用技术指标:
+        - MA5/MA20 移动平均
+        - 简单趋势判断
+        """
+        if code not in self.price_history or len(self.price_history[code]) < 10:
+            return {"code": code, "action": "HOLD", "confidence": 0.5, "reason": "数据不足"}
+        
+        prices = self.price_history[code]
+        
+        # 计算均线
+        ma5 = sum(prices[-5:]) / 5
+        ma20 = sum(prices[-20:]) / 20 if len(prices) >= 20 else sum(prices) / len(prices)
+        
+        current_price = prices[-1]
+        
+        # 生成信号
+        if ma5 > ma20 * 1.02:
+            action = "BUY"
+            confidence = min(0.85, 0.5 + (ma5 / ma20 - 1) * 10)
+            reason = f"MA5({ma5:.2f}) 上穿 MA20({ma20:.2f})，趋势向上"
+        elif ma5 < ma20 * 0.98:
+            action = "SELL"
+            confidence = min(0.85, 0.5 + (1 - ma5 / ma20) * 10)
+            reason = f"MA5({ma5:.2f}) 下穿 MA20({ma20:.2f})，趋势向下"
+        else:
+            action = "HOLD"
+            confidence = 0.5
+            reason = f"均线交织，建议观望"
+        
+        signal = {
+            "code": code,
+            "action": action,
+            "confidence": confidence,
+            "reason": reason,
+            "current_price": current_price,
+            "ma5": ma5,
+            "ma20": ma20,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        self.signals.append(signal)
+        return signal
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "tracked_stocks": len(self.price_history),
+            "signals_generated": len(self.signals)
+        }
+
 # ============================================================================
 
 class AdaptiveResourceManager:
@@ -2967,6 +3222,10 @@ class AdaptiveResourceManager:
         # 加密货币模块 (45-46)
         self.binance_client = BinanceClient()
         self.crypto_analyzer = CryptoAnalyzer()
+        
+        # 富途证券模块 (47-48)
+        self.futu_client = FutuClient()
+        self.futu_analyzer = FutuAnalyzer()
 
         self._initialized = False
 
@@ -3111,6 +3370,9 @@ class AdaptiveResourceManager:
             # 加密货币模块 (45-46)
             "binance_client": self.binance_client.get_stats(),
             "crypto_analyzer": self.crypto_analyzer.get_stats(),
+            # 富途证券模块 (47-48)
+            "futu_client": self.futu_client.get_stats(),
+            "futu_analyzer": self.futu_analyzer.get_stats(),
             "initialized": self._initialized
         }
 
@@ -3157,6 +3419,11 @@ class GreenDeploymentEngine:
     
     def get_stats(self) -> Dict[str, Any]:
         return {"deployments": len(self.deployments), "budget": self.total_budget}
+
+
+# ============================================================================
+# 全局实例
+adaptive_manager = AdaptiveResourceManager()
 
 
 # ============================================================================
